@@ -7,7 +7,7 @@
   },
   "tasks": {
     "serve": "deno run --allow-all server.ts --port=3022",
-    "check": "deno check mod.ts server.ts src/api/input-artifact.ts src/api/slicer.ts src/tools/types.ts src/tools/estimate.ts src/tools/mod.ts src/client.ts",
+    "check": "deno check mod.ts server.ts src/api/input-artifact.ts src/api/slicer.ts src/tools/types.ts src/tools/estimate.ts src/tools/mod.ts src/client.ts scripts/gen_cube_20mm_stl.ts scripts/gen_cube_20mm_gcode_fixture.ts scripts/gen_cube_gcode_fixture.ts",
     "lint": "deno lint",
     "fmt": "deno fmt --check deno.json mod.ts server.ts src tests",
     "release:check": "deno task fmt && deno task check && deno task lint && deno task test",
