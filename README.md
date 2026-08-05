@@ -132,6 +132,35 @@ scripts/
 - `pla_0.4_0.2.ini` — hand-written test profile; explicitly documented as non-production.
 - `cube.stl` — 10 mm cube, hand-written ASCII STL; used only in native integration tests.
 
+## Docker
+
+Port du parc : **3022**. Engine embarqué : PrusaSlicer 2.9.2 (Debian trixie, arm64).
+Le CLI slicing fonctionne headless (aucun display requis) ; les libs GTK3/wxWidgets
+sont des `Depends:` durs du paquet Debian mais ne lancent pas de fenêtre en mode
+`--export-gcode`.
+
+```bash
+# Build (arm64 — adapter à linux/amd64 si besoin)
+docker build --platform linux/arm64 -t mcp-prusaslicer .
+
+# Run
+docker run --rm -p 3022:3022 mcp-prusaslicer
+
+# Smoke test — protocole stateless 2026-07-28
+curl -s -X POST http://127.0.0.1:3022/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: tools/list' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+```
+
+Réponse attendue : `"tools":[{"name":"prusaslicer_estimate_fff",...}]`.
+
+Le serveur se bind à `0.0.0.0:3022` dans le conteneur via le flag `--hostname=0.0.0.0`
+(parsé par `parseCli()` dans `server.ts`). Sur l'hôte, `127.0.0.1:3022` suffit pour un
+déploiement mono-opérateur loopback.
+
 ## License
 
 MIT

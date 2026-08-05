@@ -1,0 +1,18 @@
+# Version control
+.git
+
+# Deno local cache (not the /deno-dir/ baked into the image)
+.deno/
+
+# Node artefacts
+node_modules/
+
+# Tests and test fixtures — not needed at runtime.
+# Keep tests/ out of the image; integration tests run against a live container.
+tests/
+
+# Generator scripts — used only in development to (re)generate test fixtures.
+scripts/
+
+# Editor/OS
+.DS_Store
