@@ -1,7 +1,7 @@
 /**
  * Generates tests/fixtures/cube_20mm_pla.gcode using the real prusa-slicer.
  *
- * Run inside the mcp-slicer-dev container (or any host with prusa-slicer on PATH):
+ * Run inside the mcp-prusaslicer-dev container (or any host with prusa-slicer on PATH):
  *   deno run --allow-all scripts/gen_cube_20mm_gcode_fixture.ts
  *
  * Physical parameters:
@@ -22,8 +22,10 @@
  */
 
 const CUBE_STL = new URL("../tests/fixtures/cube_20mm.stl", import.meta.url).pathname;
-const PROFILE_INI = new URL("../tests/fixtures/pla_0.4_0.2.ini", import.meta.url).pathname;
-const OUT_GCODE = new URL("../tests/fixtures/cube_20mm_pla.gcode", import.meta.url).pathname;
+const PROFILE_INI =
+  new URL("../tests/fixtures/pla_0.4_0.2.ini", import.meta.url).pathname;
+const OUT_GCODE =
+  new URL("../tests/fixtures/cube_20mm_pla.gcode", import.meta.url).pathname;
 
 const workDir = await Deno.makeTempDir({ prefix: "slicer-20mm-fixture-" });
 const gcodeOut = `${workDir}/output.gcode`;
@@ -32,9 +34,11 @@ console.log("Slicing", CUBE_STL, "...");
 
 const { success, stdout, stderr } = await new Deno.Command("prusa-slicer", {
   args: [
-    "--load", PROFILE_INI,
+    "--load",
+    PROFILE_INI,
     "--export-gcode",
-    "--output", gcodeOut,
+    "--output",
+    gcodeOut,
     CUBE_STL,
   ],
   stdout: "piped",

@@ -1,8 +1,8 @@
 /**
- * Tests for mcp-slicer.
+ * Tests for mcp-prusaslicer.
  *
  * Tests requiring prusa-slicer are guarded by an environment variable:
- *   SLICER_RUN_NATIVE=1  — enable integration tests against the real slicer.
+ *   PRUSASLICER_RUN_NATIVE=1  — enable integration tests against the real slicer.
  *
  * Unit tests (parsePrusaTime, G-code fixture parsing, schema invariants, MCP
  * wire, input validation) run without any guard and require no subprocess.
@@ -17,11 +17,11 @@
  */
 
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { parsePrusaTime } from "../src/api/slicer.ts";
+import { parsePrusaTime } from "../src/api/prusa-slicer.ts";
 import { allTools } from "../src/tools/mod.ts";
 import { createSlicerServer } from "../server.ts";
 
-const RUN_NATIVE = Deno.env.get("SLICER_RUN_NATIVE") === "1";
+const RUN_NATIVE = Deno.env.get("PRUSASLICER_RUN_NATIVE") === "1";
 
 // Fixture paths — used in both unit and native tests.
 const CUBE_10MM_STL = new URL("./fixtures/cube.stl", import.meta.url).pathname;
@@ -224,7 +224,7 @@ async function rpc(
           "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
           "io.modelcontextprotocol/clientCapabilities": {},
           "io.modelcontextprotocol/clientInfo": {
-            name: "mcp-slicer-test",
+            name: "mcp-prusaslicer-test",
             version: "0.1.0",
           },
         },
@@ -254,14 +254,14 @@ Deno.test("Slicer server starts and serves stateless MCP server/discover", async
     assertEquals(response.headers.get("mcp-session-id"), null);
     const result = body.result as Record<string, unknown>;
     const serverInfo = result.serverInfo as Record<string, unknown>;
-    assertEquals(serverInfo.name, "mcp-slicer");
+    assertEquals(serverInfo.name, "mcp-prusaslicer");
     assertEquals(serverInfo.version, "0.1.0");
   } finally {
     await http.shutdown();
   }
 });
 
-Deno.test("Slicer server lists slicer_estimate_fff in tools/list", async () => {
+Deno.test("Slicer server lists prusaslicer_estimate_fff in tools/list", async () => {
   const { app } = createSlicerServer({ logger: () => {} });
   const port = freePort();
   const http = await app.startHttp({
@@ -276,7 +276,10 @@ Deno.test("Slicer server lists slicer_estimate_fff in tools/list", async () => {
     const tools = result.tools as Array<{ name: string }>;
     assert(Array.isArray(tools), "tools must be an array");
     const names = tools.map((t) => t.name);
-    assert(names.includes("slicer_estimate_fff"), "must include slicer_estimate_fff");
+    assert(
+      names.includes("prusaslicer_estimate_fff"),
+      "must include prusaslicer_estimate_fff",
+    );
   } finally {
     await http.shutdown();
   }
@@ -286,8 +289,8 @@ Deno.test("Slicer server lists slicer_estimate_fff in tools/list", async () => {
 // Input validation — no subprocess required
 // ---------------------------------------------------------------------------
 
-Deno.test("slicer_estimate_fff rejects missing stl_path", async () => {
-  const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+Deno.test("prusaslicer_estimate_fff rejects missing stl_path", async () => {
+  const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
   assert(tool, "tool must exist");
   await assertRejects(
     () =>
@@ -299,8 +302,8 @@ Deno.test("slicer_estimate_fff rejects missing stl_path", async () => {
   );
 });
 
-Deno.test("slicer_estimate_fff rejects empty stl_path", async () => {
-  const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+Deno.test("prusaslicer_estimate_fff rejects empty stl_path", async () => {
+  const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
   assert(tool, "tool must exist");
   await assertRejects(
     () =>
@@ -313,8 +316,8 @@ Deno.test("slicer_estimate_fff rejects empty stl_path", async () => {
   );
 });
 
-Deno.test("slicer_estimate_fff rejects missing profile_ini_path", async () => {
-  const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+Deno.test("prusaslicer_estimate_fff rejects missing profile_ini_path", async () => {
+  const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
   assert(tool, "tool must exist");
   await assertRejects(
     () =>
@@ -326,8 +329,8 @@ Deno.test("slicer_estimate_fff rejects missing profile_ini_path", async () => {
   );
 });
 
-Deno.test("slicer_estimate_fff rejects invalid stl_sha256 format", async () => {
-  const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+Deno.test("prusaslicer_estimate_fff rejects invalid stl_sha256 format", async () => {
+  const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
   assert(tool, "tool must exist");
   await assertRejects(
     () =>
@@ -341,8 +344,8 @@ Deno.test("slicer_estimate_fff rejects invalid stl_sha256 format", async () => {
   );
 });
 
-Deno.test("slicer_estimate_fff rejects invalid profile_sha256 format", async () => {
-  const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+Deno.test("prusaslicer_estimate_fff rejects invalid profile_sha256 format", async () => {
+  const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
   assert(tool, "tool must exist");
   // Use a real STL so the STL snapshot succeeds; the profile hash check fires next.
   await assertRejects(
@@ -357,8 +360,8 @@ Deno.test("slicer_estimate_fff rejects invalid profile_sha256 format", async () 
   );
 });
 
-Deno.test("slicer_estimate_fff reports STL not found as InputArtifactError", async () => {
-  const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+Deno.test("prusaslicer_estimate_fff reports STL not found as InputArtifactError", async () => {
+  const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
   assert(tool, "tool must exist");
   await assertRejects(
     () =>
@@ -371,8 +374,8 @@ Deno.test("slicer_estimate_fff reports STL not found as InputArtifactError", asy
   );
 });
 
-Deno.test("slicer_estimate_fff reports profile not found as InputArtifactError", async () => {
-  const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+Deno.test("prusaslicer_estimate_fff reports profile not found as InputArtifactError", async () => {
+  const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
   assert(tool, "tool must exist");
   await assertRejects(
     () =>
@@ -386,15 +389,15 @@ Deno.test("slicer_estimate_fff reports profile not found as InputArtifactError",
 });
 
 // ---------------------------------------------------------------------------
-// Native integration tests — require SLICER_RUN_NATIVE=1 and prusa-slicer
+// Native integration tests — require PRUSASLICER_RUN_NATIVE=1 and prusa-slicer
 // ---------------------------------------------------------------------------
 
 Deno.test({
   name:
-    "slicer_estimate_fff slices a 20mm cube and returns stats matching the committed fixture",
+    "prusaslicer_estimate_fff slices a 20mm cube and returns stats matching the committed fixture",
   ignore: !RUN_NATIVE,
   fn: async () => {
-    const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+    const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
     assert(tool, "tool must exist");
 
     const result = await tool.handler({
@@ -461,10 +464,10 @@ Deno.test({
 });
 
 Deno.test({
-  name: "slicer_estimate_fff: filament_mass_g absent when profile has no density",
+  name: "prusaslicer_estimate_fff: filament_mass_g absent when profile has no density",
   ignore: !RUN_NATIVE,
   fn: async () => {
-    const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+    const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
     assert(tool, "tool must exist");
 
     // Write a profile without filament_density to a temp file.
@@ -509,10 +512,10 @@ Deno.test({
 });
 
 Deno.test({
-  name: "slicer_estimate_fff: layer_height_mm override changes slice result",
+  name: "prusaslicer_estimate_fff: layer_height_mm override changes slice result",
   ignore: !RUN_NATIVE,
   fn: async () => {
-    const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+    const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
     assert(tool, "tool must exist");
 
     // Baseline at default 0.2mm layer.
@@ -539,10 +542,10 @@ Deno.test({
 
 Deno.test({
   name:
-    "slicer_estimate_fff: filament_density_g_cm3 override provides mass when profile lacks density",
+    "prusaslicer_estimate_fff: filament_density_g_cm3 override provides mass when profile lacks density",
   ignore: !RUN_NATIVE,
   fn: async () => {
-    const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+    const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
     assert(tool, "tool must exist");
 
     // Write a profile without filament_density.
@@ -593,10 +596,10 @@ Deno.test({
 
 Deno.test({
   name:
-    "slicer_estimate_fff slices a 10mm cube (legacy fixture) and returns plausible stats",
+    "prusaslicer_estimate_fff slices a 10mm cube (legacy fixture) and returns plausible stats",
   ignore: !RUN_NATIVE,
   fn: async () => {
-    const tool = allTools.find((t) => t.name === "slicer_estimate_fff");
+    const tool = allTools.find((t) => t.name === "prusaslicer_estimate_fff");
     assert(tool, "tool must exist");
 
     const result = await tool.handler({

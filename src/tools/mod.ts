@@ -1,5 +1,5 @@
 /**
- * Tool registry for mcp-slicer.
+ * Tool registry for mcp-prusaslicer.
  *
  * allTools is the authoritative list. SlicerToolsClient builds handler maps
  * from it; tests enumerate it to assert invariants.

@@ -138,7 +138,7 @@ export async function sliceFff(options: SliceOptions): Promise<SliceResult> {
     (!isFinite(options.layerHeightMm) || options.layerHeightMm <= 0)
   ) {
     throw new SlicingError(
-      "[slicer_estimate_fff] layer_height_mm must be a positive finite number.",
+      "[prusaslicer_estimate_fff] layer_height_mm must be a positive finite number.",
     );
   }
   // Validate infill override if provided.
@@ -149,7 +149,7 @@ export async function sliceFff(options: SliceOptions): Promise<SliceResult> {
       options.infillPercent > 100)
   ) {
     throw new SlicingError(
-      "[slicer_estimate_fff] infill_percent must be an integer in 0-100.",
+      "[prusaslicer_estimate_fff] infill_percent must be an integer in 0-100.",
     );
   }
   // Validate density override if provided.
@@ -158,7 +158,7 @@ export async function sliceFff(options: SliceOptions): Promise<SliceResult> {
     (!isFinite(options.filamentDensityGcm3) || options.filamentDensityGcm3 <= 0)
   ) {
     throw new SlicingError(
-      "[slicer_estimate_fff] filament_density_g_cm3 must be a positive finite number.",
+      "[prusaslicer_estimate_fff] filament_density_g_cm3 must be a positive finite number.",
     );
   }
 

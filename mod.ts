@@ -1,5 +1,5 @@
 /**
- * @module @casys/mcp-slicer
+ * @module @casys/mcp-prusaslicer
  *
  * FDM slicing estimation MCP server.
  * Slice an STL with a PrusaSlicer INI profile; get print-time and
@@ -21,7 +21,7 @@ export {
   sliceFff,
   SlicerNotFoundError,
   SlicingError,
-} from "./src/api/slicer.ts";
+} from "./src/api/prusa-slicer.ts";
 export {
   InputArtifactError,
   snapshotIniArtifact,

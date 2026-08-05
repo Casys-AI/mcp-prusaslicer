@@ -18,7 +18,7 @@ export function createSlicerServer(
   const handlers = client.buildHandlersMap();
 
   const app = new McpApp({
-    name: "mcp-slicer",
+    name: "mcp-prusaslicer",
     version: VERSION,
     transport: "stateless",
     maxConcurrent: 4,
@@ -28,7 +28,7 @@ export function createSlicerServer(
       "PrusaSlicer INI profile; receive print-time and material-consumption " +
       "measurements from the real G-code. No prices — pricing is downstream (erpnext).",
     logger: options.logger ??
-      ((message) => console.error(`[mcp-slicer] ${message}`)),
+      ((message) => console.error(`[mcp-prusaslicer] ${message}`)),
   });
   app.registerTools(client.toMCPFormat(), handlers);
   return { app };
@@ -77,7 +77,7 @@ if (import.meta.main) {
     hostname: cli.hostname,
     corsOrigins: ["http://127.0.0.1", "http://localhost"],
     onListen: ({ hostname, port }) => {
-      console.error(`[mcp-slicer] Stateless MCP: http://${hostname}:${port}/mcp`);
+      console.error(`[mcp-prusaslicer] Stateless MCP: http://${hostname}:${port}/mcp`);
     },
   });
 }

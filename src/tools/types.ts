@@ -1,5 +1,5 @@
 /**
- * Shared types for mcp-slicer tools.
+ * Shared types for mcp-prusaslicer tools.
  *
  * One file per category; all categories export SlicerTool instances registered
  * via SlicerToolsClient.

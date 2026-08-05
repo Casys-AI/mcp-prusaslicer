@@ -1,4 +1,4 @@
-# @casys/mcp-slicer
+# @casys/mcp-prusaslicer
 
 FDM slicing estimation MCP server. Slices an STL with a caller-supplied
 PrusaSlicer INI profile and returns print-time and material-consumption
@@ -9,7 +9,7 @@ Complements `mcp-dfm` (printability) and `mcp-calculix` (structural FEA).
 
 ## Tool
 
-### `slicer_estimate_fff`
+### `prusaslicer_estimate_fff`
 
 **Inputs:**
 
@@ -92,7 +92,7 @@ prusa-slicer --load <profile.ini> [overrides...] --export-gcode --output <out.gc
 ```bash
 deno task serve                         # listen on 127.0.0.1:3022
 deno task test                          # unit + wire tests (25 tests, no slicer needed)
-SLICER_RUN_NATIVE=1 deno task test      # + 5 integration tests against real slicer
+PRUSASLICER_RUN_NATIVE=1 deno task test      # + 5 integration tests against real slicer
 deno task release:check                 # fmt --check + check + lint + test
 ```
 
@@ -108,7 +108,7 @@ src/
     slicer.ts                      PrusaSlicer subprocess bridge + G-code stat parser
   tools/
     types.ts                       SlicerTool, SlicerToolCategory, SlicerToolHandler
-    estimate.ts                    slicer_estimate_fff implementation
+    estimate.ts                    prusaslicer_estimate_fff implementation
     mod.ts                         allTools, getToolByName, toolsByCategory
 tests/
   server_test.ts                   unit + wire + native integration tests (30 total; 5 gated)

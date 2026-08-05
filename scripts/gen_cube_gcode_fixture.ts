@@ -1,7 +1,7 @@
 /**
  * Generates tests/fixtures/cube_pla.gcode using the real prusa-slicer.
  *
- * Run inside the mcp-slicer-dev container (or any host with prusa-slicer on PATH):
+ * Run inside the mcp-prusaslicer-dev container (or any host with prusa-slicer on PATH):
  *   deno run --allow-all scripts/gen_cube_gcode_fixture.ts
  *
  * Physical parameters:
@@ -47,9 +47,11 @@ console.log("Slicing", CUBE_STL, "...");
 
 const { success, stdout, stderr } = await new Deno.Command("prusa-slicer", {
   args: [
-    "--load", profilePath,
+    "--load",
+    profilePath,
     "--export-gcode",
-    "--output", gcodeOut,
+    "--output",
+    gcodeOut,
     CUBE_STL,
   ],
   stdout: "piped",
@@ -77,9 +79,7 @@ try {
 // Print key stats so the committer can verify physical plausibility.
 const statsLines = gcodeText
   .split("\n")
-  .filter((l) =>
-    l.match(/filament used|estimated printing time|total filament/i)
-  );
+  .filter((l) => l.match(/filament used|estimated printing time|total filament/i));
 console.log("\n--- Stats from generated G-code ---");
 statsLines.forEach((l) => console.log(l));
 

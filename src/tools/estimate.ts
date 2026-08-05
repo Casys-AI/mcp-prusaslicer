@@ -1,5 +1,5 @@
 /**
- * slicer_estimate_fff — FDM slicing estimation tool.
+ * prusaslicer_estimate_fff — FDM slicing estimation tool.
  *
  * Slices an STL with a caller-supplied PrusaSlicer INI profile and returns
  * print-time and material-consumption measurements from the real G-code stats.
@@ -24,10 +24,10 @@ import {
   snapshotIniArtifact,
   snapshotStlArtifact,
 } from "../api/input-artifact.ts";
-import { sliceFff, SlicerNotFoundError, SlicingError } from "../api/slicer.ts";
+import { sliceFff, SlicerNotFoundError, SlicingError } from "../api/prusa-slicer.ts";
 import type { SlicerTool } from "./types.ts";
 
-const TOOL_NAME = "slicer_estimate_fff";
+const TOOL_NAME = "prusaslicer_estimate_fff";
 
 const NOT_CHECKED: string[] = [
   "Bed adhesion (first-layer adhesion to build plate) is not verified.",
