@@ -12,7 +12,9 @@ node_modules/
 tests/
 
 # Generator scripts — used only in development to (re)generate test fixtures.
+# stdio-shim.ts is needed at runtime (stdio mode) so it is re-included below.
 scripts/
+!scripts/stdio-shim.ts
 
 # Editor/OS
 .DS_Store

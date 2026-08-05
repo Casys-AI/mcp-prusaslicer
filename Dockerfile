@@ -36,21 +36,15 @@ WORKDIR /app
 COPY deno.json deno.lock ./
 COPY src/ src/
 COPY mod.ts server.ts ./
+COPY scripts/ scripts/
+COPY docker-entrypoint.sh ./
 
 # Pre-populate /deno-dir/ (DENO_DIR in this base image) with all remote deps.
 # --frozen: fail the build if deno.lock would change (integrity gate).
-RUN deno cache --frozen server.ts mod.ts
+RUN deno cache --frozen server.ts mod.ts scripts/stdio-shim.ts
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
 EXPOSE 3022
 
-# parseCli() in server.ts supports --hostname (overrides DEFAULT_HOSTNAME=127.0.0.1).
-# We pass --hostname=0.0.0.0 so the server is reachable from outside the container.
-# --allow-all mirrors the deno task serve definition in deno.json.
-# --cached-only: refuse any network fetch not already in /deno-dir/ (fail-fast).
-CMD ["deno", "run", \
-     "--allow-all", \
-     "--cached-only", \
-     "server.ts", \
-     "--port=3022", \
-     "--hostname=0.0.0.0"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["http"]
