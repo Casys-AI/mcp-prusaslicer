@@ -1,10 +1,18 @@
 /**
- * Snapshot and attest an input STL file before handing it to the slicer.
+ * Snapshot and attest input files before handing them to the slicer.
  *
- * The caller provides a path; we copy the file into a private temp directory,
- * hash the copy, and optionally verify a declared digest. The copy is made
- * read-only before any subprocess sees it. The returned handle carries a
- * cleanup() that must be called in a finally block.
+ * Two surfaces are exposed:
+ *   snapshotStlArtifact  — STL geometry file
+ *   snapshotIniArtifact  — PrusaSlicer INI profile
+ *
+ * Both follow the same pattern:
+ *   1. Copy the source file into a private temp directory.
+ *   2. Compute the SHA-256 of the private copy.
+ *   3. Optionally verify an expected digest.
+ *   4. Make the copy read-only before any subprocess sees it.
+ *
+ * The returned handle carries a cleanup() that MUST be called in a finally
+ * block — even when the subprocess fails.
  */
 
 /** Raised when the provided artifact is invalid or cannot be snapshotted. */
@@ -26,7 +34,7 @@ export interface InputArtifact {
   bytes: number;
 }
 
-export interface StlSnapshot {
+export interface ArtifactSnapshot {
   artifact: InputArtifact;
   cleanup(): Promise<void>;
 }
@@ -39,56 +47,94 @@ function sha256Hex(bytes: Uint8Array): Promise<string> {
 }
 
 /**
- * Copy the STL at sourcePath into a private temp directory, hash the copy,
- * optionally verify expectedSha256, then make the copy read-only.
- *
- * Caller MUST invoke cleanup() in a finally block.
+ * Generic snapshot implementation. Exposed via typed wrappers below.
  */
-export async function snapshotStlArtifact(
+async function snapshotFile(
   toolName: string,
+  kind: string,
+  extension: string,
+  prefix: string,
   sourcePath: string,
-  expectedSha256?: string,
-): Promise<StlSnapshot> {
+  expectedSha256: string | undefined,
+): Promise<ArtifactSnapshot> {
   if (expectedSha256 !== undefined && !/^[a-fA-F0-9]{64}$/.test(expectedSha256)) {
     throw new InputArtifactError(
-      `[${toolName}] expected_stl_sha256 must be a 64-character hexadecimal SHA-256 digest.`,
+      `[${toolName}] expected_${kind}_sha256 must be a 64-character hexadecimal SHA-256 digest.`,
     );
   }
 
-  const workDir = await Deno.makeTempDir({ prefix: "slicer-input-" });
-  const snapshotPath = `${workDir}/input.stl`;
+  const workDir = await Deno.makeTempDir({ prefix });
+  const snapshotPath = `${workDir}/input.${extension}`;
   const cleanup = () => Deno.remove(workDir, { recursive: true }).catch(() => {});
 
   try {
     await Deno.copyFile(sourcePath, snapshotPath);
     const fileBytes = await Deno.readFile(snapshotPath);
     if (fileBytes.length === 0) {
-      throw new InputArtifactError(`[${toolName}] STL input is empty: ${sourcePath}`);
+      throw new InputArtifactError(
+        `[${toolName}] ${kind.toUpperCase()} input is empty: ${sourcePath}`,
+      );
     }
     const sha256 = await sha256Hex(fileBytes);
     if (expectedSha256 !== undefined && sha256 !== expectedSha256.toLowerCase()) {
       throw new InputArtifactError(
-        `[${toolName}] STL SHA-256 mismatch: expected ${expectedSha256.toLowerCase()}, ` +
+        `[${toolName}] ${kind.toUpperCase()} SHA-256 mismatch: ` +
+          `expected ${expectedSha256.toLowerCase()}, ` +
           `computed ${sha256} from the private input snapshot.`,
       );
     }
     // Freeze the snapshot before any subprocess reads it.
     await Deno.chmod(snapshotPath, 0o400);
     return {
-      artifact: {
-        path: snapshotPath,
-        sourcePath,
-        sha256,
-        bytes: fileBytes.length,
-      },
+      artifact: { path: snapshotPath, sourcePath, sha256, bytes: fileBytes.length },
       cleanup,
     };
   } catch (error) {
     await cleanup();
     if (error instanceof InputArtifactError) throw error;
     if (error instanceof Deno.errors.NotFound) {
-      throw new InputArtifactError(`[${toolName}] STL file not found: ${sourcePath}`);
+      throw new InputArtifactError(
+        `[${toolName}] ${kind.toUpperCase()} file not found: ${sourcePath}`,
+      );
     }
     throw error;
   }
+}
+
+/**
+ * Copy the STL at sourcePath into a private temp directory, hash the copy,
+ * optionally verify expectedSha256, then make the copy read-only.
+ */
+export function snapshotStlArtifact(
+  toolName: string,
+  sourcePath: string,
+  expectedSha256?: string,
+): Promise<ArtifactSnapshot> {
+  return snapshotFile(
+    toolName,
+    "stl",
+    "stl",
+    "slicer-stl-",
+    sourcePath,
+    expectedSha256,
+  );
+}
+
+/**
+ * Copy the INI profile at sourcePath into a private temp directory, hash the
+ * copy, optionally verify expectedSha256, then make the copy read-only.
+ */
+export function snapshotIniArtifact(
+  toolName: string,
+  sourcePath: string,
+  expectedSha256?: string,
+): Promise<ArtifactSnapshot> {
+  return snapshotFile(
+    toolName,
+    "ini",
+    "ini",
+    "slicer-ini-",
+    sourcePath,
+    expectedSha256,
+  );
 }

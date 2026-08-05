@@ -1,19 +1,31 @@
 /**
  * Bridge to the PrusaSlicer CLI.
  *
- * The caller supplies an INI profile string (printer + filament + print
- * settings). We write it to a temp file, invoke prusa-slicer, then parse
- * the G-code comment block that PrusaSlicer emits at the end of every file.
+ * The caller supplies a path to an INI profile (printer + filament + print
+ * settings) plus the frozen STL snapshot path. Both are the caller's
+ * responsibility — the server injects no hidden defaults.
+ *
+ * Optional explicit overrides are forwarded as CLI flags on top of the profile:
+ *   --layer-height N       (layer_height_mm)
+ *   --fill-density N%      (infill_percent, expressed as integer 0-100)
+ *   --filament-density N   (filament_density_g_cm3)
  *
  * Validated CLI syntax (PrusaSlicer 2.9.2, aarch64 Debian trixie):
- *   prusa-slicer --load <profile.ini> --export-gcode --output <out.gcode> <in.stl>
+ *   prusa-slicer --load <profile.ini> [overrides...] \
+ *     --export-gcode --output <out.gcode> <in.stl>
  *
  * Stats always present in the G-code comment block:
- *   ; filament used [mm] = 426.64
- *   ; filament used [cm3] = 1.03
- *   ; filament used [g] = 1.27        (only when filament_density is set)
- *   ; estimated printing time (normal mode) = 12m 45s
- *   ; estimated printing time (silent mode) = 12m 50s
+ *   ; filament used [mm] = 1487.15
+ *   ; filament used [cm3] = 3.58         → filament_volume_mm3 = 3580
+ *   ; filament used [g]   = 4.44         (only when filament_density is set)
+ *   ; estimated printing time (normal mode) = 19m 50s
+ *   ; estimated printing time (silent mode) = 20m 40s
+ *
+ * Reference values for the 20 mm cube at pla_0.4_0.2.ini (PrusaSlicer 2.9.2):
+ *   filament_length_mm  = 1487.15
+ *   filament_volume_mm3 = 3580
+ *   filament_mass_g     = 4.44
+ *   print_time_s        = 1190  (19m 50s)
  */
 
 /** Raised when the prusa-slicer executable cannot be found on PATH. */
@@ -36,40 +48,62 @@ export class SlicingError extends Error {
 }
 
 export interface SliceOptions {
-  /** Path to the frozen STL snapshot (read-only, absolute). */
+  /** Path to the frozen STL snapshot (read-only, from snapshotStlArtifact). */
   stlPath: string;
+  /** Path to the frozen INI profile snapshot (read-only, from snapshotIniArtifact). */
+  profileIniPath: string;
   /**
-   * Full INI profile content as a string (printer + filament + print
-   * settings). The caller is the authority on what parameters are used;
-   * the server never injects hidden defaults.
+   * Override the layer height from the profile.
+   * Forwarded as --layer-height N to prusa-slicer.
    */
-  profileIni: string;
+  layerHeightMm?: number;
+  /**
+   * Override the infill density from the profile (integer, 0-100 percent).
+   * Forwarded as --fill-density N% to prusa-slicer.
+   */
+  infillPercent?: number;
+  /**
+   * Override the filament density from the profile (g/cm³).
+   * Forwarded as --filament-density N to prusa-slicer.
+   * When absent and the profile also lacks density, filament_mass_g is absent.
+   */
+  filamentDensityGcm3?: number;
   /** Maximum time to wait for prusa-slicer before sending SIGKILL. */
   timeoutMs?: number;
 }
 
 export interface SliceResult {
   /** Filament length consumed, in mm. */
-  filament_used_mm: number;
-  /** Filament volume consumed, in cm³. */
-  filament_used_cm3: number;
+  filament_length_mm: number;
+  /**
+   * Filament volume consumed, in mm³.
+   * Converted from the "filament used [cm3]" G-code comment (× 1000).
+   */
+  filament_volume_mm3: number;
   /**
    * Filament mass consumed, in grams.
-   * null when filament_density is absent from the profile (no density → no mass).
+   * Absent when neither the profile nor the override provides filament_density.
    */
-  filament_used_g: number | null;
-  /** Raw time string as written by PrusaSlicer, e.g. "12m 45s". */
-  print_time_normal_mode: string;
-  /** Raw time string for silent mode (lower accelerations), e.g. "12m 50s". */
-  print_time_silent_mode: string | null;
+  filament_mass_g: number | null;
   /** Estimated print time in seconds (normal mode). */
-  estimated_print_time_s: number;
+  print_time_s: number;
+  /** Raw time string as written by PrusaSlicer, e.g. "19m 50s". */
+  print_time_normal_mode: string;
+  /** Raw time string for silent mode, e.g. "20m 40s". null if absent from G-code. */
+  print_time_silent_mode: string | null;
+  /**
+   * SHA-256 hex digest of the produced G-code file.
+   * NOTE: PrusaSlicer embeds a build timestamp — identical inputs on different
+   * dates produce different hashes. The hash is an audit trail, not a
+   * reproducibility guarantee.
+   */
+  gcode_sha256: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 /**
- * Parse "12m 45s", "1h 2m 30s", "45s" etc. into total seconds.
+ * Parse "19m 50s", "1h 2m 30s", "45s" etc. into total seconds.
  * Returns null if the format is unrecognised.
  */
 export function parsePrusaTime(raw: string): number | null {
@@ -83,35 +117,75 @@ export function parsePrusaTime(raw: string): number | null {
   return h * 3600 + min * 60 + sec;
 }
 
+function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const contiguous = Uint8Array.from(bytes);
+  return crypto.subtle.digest("SHA-256", contiguous.buffer).then((digest) =>
+    Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("")
+  );
+}
+
 /**
  * Slice an STL using a caller-supplied INI profile. Returns measurements
- * extracted from the G-code comment block. Does not emit prices.
+ * extracted from the G-code comment block plus the G-code hash.
+ * Does not emit prices.
  */
 export async function sliceFff(options: SliceOptions): Promise<SliceResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  if (!options.profileIni.trim()) {
+  // Validate layer height override if provided.
+  if (
+    options.layerHeightMm !== undefined &&
+    (!isFinite(options.layerHeightMm) || options.layerHeightMm <= 0)
+  ) {
     throw new SlicingError(
-      "[slicer_estimate_fff] profile_ini must not be empty. " +
-        "Provide a PrusaSlicer-compatible INI with at minimum: " +
-        "nozzle_diameter, layer_height, filament_diameter, bed_shape.",
+      "[slicer_estimate_fff] layer_height_mm must be a positive finite number.",
+    );
+  }
+  // Validate infill override if provided.
+  if (
+    options.infillPercent !== undefined &&
+    (!Number.isInteger(options.infillPercent) ||
+      options.infillPercent < 0 ||
+      options.infillPercent > 100)
+  ) {
+    throw new SlicingError(
+      "[slicer_estimate_fff] infill_percent must be an integer in 0-100.",
+    );
+  }
+  // Validate density override if provided.
+  if (
+    options.filamentDensityGcm3 !== undefined &&
+    (!isFinite(options.filamentDensityGcm3) || options.filamentDensityGcm3 <= 0)
+  ) {
+    throw new SlicingError(
+      "[slicer_estimate_fff] filament_density_g_cm3 must be a positive finite number.",
     );
   }
 
   const workDir = await Deno.makeTempDir({ prefix: "slicer-run-" });
-  const profilePath = `${workDir}/profile.ini`;
   const gcodeOut = `${workDir}/output.gcode`;
   const cleanup = () => Deno.remove(workDir, { recursive: true }).catch(() => {});
 
-  try {
-    await Deno.writeTextFile(profilePath, options.profileIni);
+  // Build CLI override flags (applied on top of the profile).
+  const overrideArgs: string[] = [];
+  if (options.layerHeightMm !== undefined) {
+    overrideArgs.push("--layer-height", String(options.layerHeightMm));
+  }
+  if (options.infillPercent !== undefined) {
+    overrideArgs.push("--fill-density", `${options.infillPercent}%`);
+  }
+  if (options.filamentDensityGcm3 !== undefined) {
+    overrideArgs.push("--filament-density", String(options.filamentDensityGcm3));
+  }
 
+  try {
     let child;
     try {
       child = new Deno.Command("prusa-slicer", {
         args: [
           "--load",
-          profilePath,
+          options.profileIniPath,
+          ...overrideArgs,
           "--export-gcode",
           "--output",
           gcodeOut,
@@ -143,9 +217,9 @@ export async function sliceFff(options: SliceOptions): Promise<SliceResult> {
     }
 
     // exit 0 does not guarantee the G-code file was written — verify.
-    let gcodeText: string;
+    let gcodeBytes: Uint8Array;
     try {
-      gcodeText = await Deno.readTextFile(gcodeOut);
+      gcodeBytes = await Deno.readFile(gcodeOut);
     } catch {
       throw new SlicingError(
         "prusa-slicer reported success but wrote no G-code file. Log: " +
@@ -153,13 +227,17 @@ export async function sliceFff(options: SliceOptions): Promise<SliceResult> {
       );
     }
 
-    if (!gcodeText.trim()) {
+    if (!gcodeBytes.length) {
       throw new SlicingError(
         "prusa-slicer wrote an empty G-code file. Log: " + log.slice(-400),
       );
     }
 
-    return parseGcodeStats(gcodeText);
+    const gcodeText = new TextDecoder().decode(gcodeBytes);
+    const gcode_sha256 = await sha256Hex(gcodeBytes);
+    const sliceResult = parseGcodeStats(gcodeText);
+
+    return { ...sliceResult, gcode_sha256 };
   } finally {
     await cleanup();
   }
@@ -168,8 +246,13 @@ export async function sliceFff(options: SliceOptions): Promise<SliceResult> {
 /**
  * Extract measurement fields from the PrusaSlicer G-code comment block.
  * These comment lines always appear near the end of the file.
+ *
+ * Fail-closed: any format deviation raises a SlicingError naming the exact
+ * line that could not be parsed.
  */
-function parseGcodeStats(gcode: string): SliceResult {
+function parseGcodeStats(
+  gcode: string,
+): Omit<SliceResult, "gcode_sha256"> {
   function extract(pattern: RegExp): string | null {
     const m = gcode.match(pattern);
     return m ? m[1].trim() : null;
@@ -185,46 +268,71 @@ function parseGcodeStats(gcode: string): SliceResult {
     /^;\s*estimated printing time \(silent mode\)\s*=\s*(.+)$/m,
   );
 
-  if (!mmRaw || !cm3Raw || !timeNormalRaw) {
+  if (!mmRaw) {
     throw new SlicingError(
-      "G-code output is missing expected stat comments " +
-        "(filament used [mm], filament used [cm3], estimated printing time). " +
+      "G-code is missing expected stat comment: '; filament used [mm] = ...'. " +
+        "The profile may have caused a partially failed slice.",
+    );
+  }
+  if (!cm3Raw) {
+    throw new SlicingError(
+      "G-code is missing expected stat comment: '; filament used [cm3] = ...'. " +
+        "The profile may have caused a partially failed slice.",
+    );
+  }
+  if (!timeNormalRaw) {
+    throw new SlicingError(
+      "G-code is missing expected stat comment: " +
+        "'; estimated printing time (normal mode) = ...'. " +
         "The profile may have caused a partially failed slice.",
     );
   }
 
-  const filament_used_mm = parseFloat(mmRaw);
-  const filament_used_cm3 = parseFloat(cm3Raw);
+  const filament_length_mm = parseFloat(mmRaw);
+  const filament_cm3 = parseFloat(cm3Raw);
 
-  if (!isFinite(filament_used_mm) || !isFinite(filament_used_cm3)) {
+  if (!isFinite(filament_length_mm)) {
     throw new SlicingError(
-      `Could not parse filament stats from G-code: mm="${mmRaw}" cm3="${cm3Raw}".`,
+      `Could not parse filament length from G-code: '; filament used [mm] = ${mmRaw}'.`,
+    );
+  }
+  if (!isFinite(filament_cm3)) {
+    throw new SlicingError(
+      `Could not parse filament volume from G-code: '; filament used [cm3] = ${cm3Raw}'.`,
     );
   }
 
-  // g is only present when filament_density is declared in the profile.
-  let filament_used_g: number | null = null;
+  // Convert cm³ → mm³ for the output contract.
+  const filament_volume_mm3 = Math.round(filament_cm3 * 1000 * 100) / 100;
+
+  // Mass is only present when filament_density is declared in the profile.
+  // PrusaSlicer emits "0.00" when density is missing — treat as absent.
+  let filament_mass_g: number | null = null;
   if (gRaw !== null) {
     const parsed = parseFloat(gRaw);
-    // PrusaSlicer emits "0.00" when density is missing — treat as absent.
-    if (isFinite(parsed) && parsed > 0) {
-      filament_used_g = parsed;
+    if (!isFinite(parsed)) {
+      throw new SlicingError(
+        `Could not parse filament mass from G-code: '; filament used [g] = ${gRaw}'.`,
+      );
+    }
+    if (parsed > 0) {
+      filament_mass_g = parsed;
     }
   }
 
-  const estimated_print_time_s = parsePrusaTime(timeNormalRaw);
-  if (estimated_print_time_s === null) {
+  const print_time_s = parsePrusaTime(timeNormalRaw);
+  if (print_time_s === null) {
     throw new SlicingError(
-      `Could not parse print time from G-code: "${timeNormalRaw}".`,
+      `Could not parse print time from G-code: '; estimated printing time (normal mode) = ${timeNormalRaw}'.`,
     );
   }
 
   return {
-    filament_used_mm,
-    filament_used_cm3,
-    filament_used_g,
+    filament_length_mm,
+    filament_volume_mm3,
+    filament_mass_g,
+    print_time_s,
     print_time_normal_mode: timeNormalRaw,
     print_time_silent_mode: timeSilentRaw,
-    estimated_print_time_s,
   };
 }

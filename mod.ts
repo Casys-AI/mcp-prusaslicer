@@ -22,4 +22,8 @@ export {
   SlicerNotFoundError,
   SlicingError,
 } from "./src/api/slicer.ts";
-export { InputArtifactError, snapshotStlArtifact } from "./src/api/input-artifact.ts";
+export {
+  InputArtifactError,
+  snapshotIniArtifact,
+  snapshotStlArtifact,
+} from "./src/api/input-artifact.ts";
