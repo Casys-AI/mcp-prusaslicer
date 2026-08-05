@@ -1,0 +1,8 @@
+# Deno cache
+.deno/
+
+# Node (if any tooling leaks in)
+node_modules/
+
+# OS
+.DS_Store

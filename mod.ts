@@ -1,0 +1,25 @@
+/**
+ * @module @casys/mcp-slicer
+ *
+ * FDM slicing estimation MCP server.
+ * Slice an STL with a PrusaSlicer INI profile; get print-time and
+ * material-consumption measurements from the real G-code.
+ */
+
+export { createSlicerServer } from "./server.ts";
+export type { CreateSlicerServerOptions } from "./server.ts";
+
+export { SlicerToolsClient } from "./src/client.ts";
+export { allTools, getToolByName, toolsByCategory } from "./src/tools/mod.ts";
+export type {
+  SlicerTool,
+  SlicerToolCategory,
+  SlicerToolHandler,
+} from "./src/tools/types.ts";
+export {
+  parsePrusaTime,
+  sliceFff,
+  SlicerNotFoundError,
+  SlicingError,
+} from "./src/api/slicer.ts";
+export { InputArtifactError, snapshotStlArtifact } from "./src/api/input-artifact.ts";
