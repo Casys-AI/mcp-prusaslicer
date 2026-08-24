@@ -3,7 +3,7 @@
 import { McpApp } from "@casys/mcp-server";
 import { SlicerToolsClient } from "./src/client.ts";
 
-const VERSION = "0.1.0";
+const VERSION = "0.3.0";
 const DEFAULT_PORT = 3022;
 const DEFAULT_HOSTNAME = "127.0.0.1";
 

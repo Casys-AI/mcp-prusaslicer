@@ -7,6 +7,7 @@
  */
 import { assert, assertEquals } from "@std/assert";
 import { TextLineStream } from "@std/streams/text-line-stream";
+import denoConfig from "../deno.json" with { type: "json" };
 
 const SHIM_PORT = 3932;
 
@@ -80,6 +81,11 @@ Deno.test(
       );
       const serverInfo = init.serverInfo as Record<string, unknown>;
       assertEquals(serverInfo.name, "mcp-prusaslicer");
+      assertEquals(
+        serverInfo.version,
+        denoConfig.version,
+        "stdio initialize version must match the package manifest",
+      );
 
       const listed = responses[1].result as Record<string, unknown>;
       assertEquals(responses[1].id, 2);

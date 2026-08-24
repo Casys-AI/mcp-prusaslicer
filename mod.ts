@@ -17,10 +17,17 @@ export type {
   SlicerToolHandler,
 } from "./src/tools/types.ts";
 export {
+  parseGcodeStats,
   parsePrusaTime,
   sliceFff,
   SlicerNotFoundError,
   SlicingError,
+} from "./src/api/prusa-slicer.ts";
+export type {
+  AppliedOverrides,
+  GcodeStats,
+  SliceOptions,
+  SliceResult,
 } from "./src/api/prusa-slicer.ts";
 export {
   InputArtifactError,
