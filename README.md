@@ -15,7 +15,11 @@ This is a slicing estimate, not printer telemetry or a price quote. It complemen
 ## Quick start: Docker over stdio
 
 The published image bundles PrusaSlicer 2.9.2 and runs without a display. A classic
-stdio MCP host can launch it without a native PrusaSlicer installation:
+stdio MCP host can launch it without a native PrusaSlicer installation. The digest
+below is the published multi-architecture 0.3.0 image. Package metadata and server
+runtime identity in that image are aligned at 0.3.0. Both `linux/amd64` and
+`linux/arm64` OCI labels point to commit
+`f1cf6dd5489f64f53458117f291a5bd779ed1efb`.
 
 ```json
 {
@@ -28,7 +32,7 @@ stdio MCP host can launch it without a native PrusaSlicer installation:
         "-i",
         "-v",
         "/absolute/path/to/slicing-jobs:/data:ro",
-        "ghcr.io/casys-ai/mcp-prusaslicer@sha256:52bb17da9db8fa59e62ce49d5695cd9982ea91fb0150f720e029ef9612f0a342",
+        "ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97",
         "stdio"
       ]
     }
@@ -54,7 +58,7 @@ The default image mode is stateless HTTP on `/mcp`, port 3022, protocol `2026-07
 docker run --rm \
   -p 127.0.0.1:3022:3022 \
   -v "$PWD/tests/fixtures:/data:ro" \
-  ghcr.io/casys-ai/mcp-prusaslicer@sha256:52bb17da9db8fa59e62ce49d5695cd9982ea91fb0150f720e029ef9612f0a342
+  ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97
 ```
 
 From a source checkout, this complete call slices the committed 20 mm cube with the
@@ -100,19 +104,23 @@ The native reference call returns these values in `structuredContent`:
 }
 ```
 
-It also returns `gcode_sha256`, both input attestations, and `not_checked`. The text
-`content` is only a short model-facing summary; use `structuredContent` for automation.
+It also returns `gcode_sha256`, `engine_name`, `engine_version`,
+`effective_config_sha256`, `overrides_applied`, both input attestations, and
+`not_checked`. The text `content` is only a short model-facing summary; use
+`structuredContent` for automation.
 
-The examples above use the published multi-architecture image
-`ghcr.io/casys-ai/mcp-prusaslicer@sha256:52bb17da9db8fa59e62ce49d5695cd9982ea91fb0150f720e029ef9612f0a342`.
-Its `/app/deno.json` package version is `0.2.0`, but `/app/server.ts` still has the
-legacy `VERSION` `0.1.0`, so `server/discover` or health runtime identity from that
-published package or image reports `0.1.0`. `ghcr.io/casys-ai/mcp-prusaslicer:latest` is
-a mutable convenience tag, not the authority for a specific version or capability. This
-checkout prepares 0.3.0, which is not published yet; package metadata and server
-`VERSION` are aligned there. `engine_name`, `engine_version`, `effective_config_sha256`,
-and `overrides_applied` are prepared-source / local-image behavior until 0.3.0 is
-published.
+The examples above use the published multi-architecture 0.3.0 image
+`ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97`.
+Package metadata and server runtime identity in that image are both `0.3.0`. Both
+`linux/amd64` and `linux/arm64` OCI labels point to commit
+`f1cf6dd5489f64f53458117f291a5bd779ed1efb`. `ghcr.io/casys-ai/mcp-prusaslicer:latest`
+is a mutable convenience tag, not the authority for a specific version or capability.
+
+The earlier 0.2.0 package and image are historical. That image's `/app/deno.json`
+package version is `0.2.0`, but `/app/server.ts` still has the legacy `VERSION`
+`0.1.0`, so `server/discover` or health runtime identity from that published package
+or image reports `0.1.0`. Those artifacts do not emit `engine_name`, `engine_version`,
+`effective_config_sha256`, or `overrides_applied`.
 
 The images are published for `linux/amd64` and `linux/arm64`. Pin the OCI digest when a
 deployment must be reproducible.
@@ -244,11 +252,12 @@ deno task serve
 deno task serve -- --port=3099 --hostname=0.0.0.0
 ```
 
-This checkout's package metadata is `0.3.0` and is not published yet. The working
-JSR command stays on the published package `@0.2.0`:
+The published JSR package is `0.3.0`; package metadata and server runtime identity
+are aligned. The earlier `@0.2.0` package is historical; its runtime identity still
+reports `0.1.0`.
 
 ```bash
-deno run -A jsr:@casys/mcp-prusaslicer@0.2.0/server --port=3022
+deno run -A jsr:@casys/mcp-prusaslicer@0.3.0/server --port=3022
 ```
 
 Both commands expose stateless HTTP only. For stdio, use the Docker mode above or run
