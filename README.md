@@ -12,19 +12,19 @@ This is a slicing estimate, not printer telemetry or a price quote. It complemen
 [`mcp-dfm`](https://github.com/Casys-AI/mcp-dfm), which measures STEP geometry, and
 [`mcp-calculix`](https://github.com/Casys-AI/mcp-calculix), which performs FEA.
 
-## Previously published Docker image over HTTP
+## Published Docker image 0.3.1
 
-The previously published 0.3.0 image bundles PrusaSlicer 2.9.2 and runs without a
-display. Its executable path is stateless HTTP on `/mcp`, port 3022, protocol
-`2026-07-28`. Package metadata and server runtime identity in that image are aligned at
-0.3.0. Both `linux/amd64` and `linux/arm64` OCI labels point to commit
-`f1cf6dd5489f64f53458117f291a5bd779ed1efb`.
+The published 0.3.1 image bundles PrusaSlicer 2.9.2 and runs without a display. It
+defaults to stateless HTTP on `/mcp`, port 3022, protocol `2026-07-28`; pass `stdio`
+to use native MCP stdio instead. Package metadata and server runtime identity are both
+`0.3.1`. Its `linux/amd64` and `linux/arm64` OCI labels point to commit
+`2e69f5b0ebceda11cc20f3afa5692078fd50a789`.
 
 ```bash
 docker run --rm \
   -p 127.0.0.1:3022:3022 \
   -v "$PWD/tests/fixtures:/data:ro" \
-  ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97
+  ghcr.io/casys-ai/mcp-prusaslicer@sha256:bb9c857c5d059215f9297843eb7b252b1663492c059d8c8301d5598947d06f4b http
 ```
 
 Point a Streamable HTTP MCP client at `http://127.0.0.1:3022/mcp`.
@@ -79,12 +79,10 @@ It also returns `gcode_sha256`, `engine_name`, `engine_version`,
 `not_checked`. The text `content` is only a short model-facing summary; use
 `structuredContent` for automation.
 
-The examples above use the previously published multi-architecture 0.3.0 HTTP image
-`ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97`.
-Package metadata and server runtime identity in that image are both `0.3.0`. Both
-`linux/amd64` and `linux/arm64` OCI labels point to commit
-`f1cf6dd5489f64f53458117f291a5bd779ed1efb`. `ghcr.io/casys-ai/mcp-prusaslicer:latest`
-is a mutable convenience tag, not the authority for a specific version or capability.
+The examples above use the published multi-architecture 0.3.1 image
+`ghcr.io/casys-ai/mcp-prusaslicer@sha256:bb9c857c5d059215f9297843eb7b252b1663492c059d8c8301d5598947d06f4b`.
+`ghcr.io/casys-ai/mcp-prusaslicer:latest` is a mutable convenience tag, not the
+authority for a specific version or capability.
 
 The earlier 0.2.0 package and image are historical. That image's `/app/deno.json`
 package version is `0.2.0`, but `/app/server.ts` still has the legacy `VERSION`
@@ -229,11 +227,9 @@ package is historical; its runtime identity still reports `0.1.0`.
 deno run -A jsr:@casys/mcp-prusaslicer@0.3.1/server --port=3022
 ```
 
-## Native stdio from a checkout, JSR 0.3.1, or local image
+## Native stdio from a checkout, JSR 0.3.1, or published image
 
-Version 0.3.1 provides native stdio. The previously published 0.3.0 JSR package and
-pinned Docker digest predate it and cannot dispatch an actual `tools/call` over stdio;
-use their HTTP endpoints.
+Version 0.3.1 provides native stdio.
 
 From a checkout:
 
@@ -247,11 +243,12 @@ Or from JSR 0.3.1:
 deno run -A jsr:@casys/mcp-prusaslicer@0.3.1/server --stdio
 ```
 
-Or build a local image:
+Or use the published image with `stdio` as its argument:
 
 ```bash
-docker build -t mcp-prusaslicer:local .
-docker run --rm -i -v "$PWD/tests/fixtures:/data:ro" mcp-prusaslicer:local stdio
+docker run --rm -i \
+  -v "$PWD/tests/fixtures:/data:ro" \
+  ghcr.io/casys-ai/mcp-prusaslicer@sha256:bb9c857c5d059215f9297843eb7b252b1663492c059d8c8301d5598947d06f4b stdio
 ```
 
 All 0.3.1 paths use the MCP server's native transport and accept legacy `2025-06-18`
