@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning:
 
 ## [Unreleased]
 
+## 0.3.1 — 2026-08-27
+
+### Changed
+
+- `--stdio` now starts the server's native MCP stdio transport. It accepts legacy
+  `2025-06-18` initialization and dispatches tool calls directly, while the stateless
+  HTTP transport remains unchanged.
+
 ## 0.3.0 — 2026-08-25
 
 - `prusaslicer_estimate_fff` returns `engine_name` and `engine_version` parsed from the

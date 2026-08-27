@@ -16,7 +16,7 @@
  *   estimated printing time (silent mode) = 20m 40s
  */
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import denoConfig from "../deno.json" with { type: "json" };
 import {
   collectAppliedOverrides,
@@ -26,7 +26,7 @@ import {
   SlicingError,
 } from "../src/api/prusa-slicer.ts";
 import { allTools } from "../src/tools/mod.ts";
-import { createSlicerServer } from "../server.ts";
+import { createSlicerServer, parseCli } from "../server.ts";
 
 const RUN_NATIVE = Deno.env.get("PRUSASLICER_RUN_NATIVE") === "1";
 
@@ -302,6 +302,27 @@ Deno.test("All slicer tools declare openWorldHint=false and destructiveHint=fals
       false,
       `${tool.name}: destructiveHint must be false`,
     );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CLI transport selection
+// ---------------------------------------------------------------------------
+
+Deno.test("--stdio selects native stdio without HTTP flags", () => {
+  assertEquals(parseCli(["--stdio"]).transport, "stdio");
+});
+
+Deno.test("--stdio rejects HTTP flags in either order", () => {
+  for (
+    const args of [
+      ["--stdio", "--port=3022"],
+      ["--port", "3022", "--stdio"],
+      ["--stdio", "--hostname=0.0.0.0"],
+      ["--hostname", "0.0.0.0", "--stdio"],
+    ]
+  ) {
+    assertThrows(() => parseCli(args), TypeError, "--stdio cannot be combined");
   }
 });
 

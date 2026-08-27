@@ -30,18 +30,17 @@ RUN apt-get update -qq \
 WORKDIR /app
 
 # ─── Deno dependency cache ────────────────────────────────────────────────────
-# Copy the lock file and all source files consumed at import time so that
+# Copy the lock file and all runtime source files consumed at import time so that
 # `deno cache` can fully resolve the import graph. The lock file (deno.lock v5)
 # pins every JSR/npm specifier; --frozen rejects any drift at run time too.
 COPY deno.json deno.lock ./
 COPY src/ src/
 COPY mod.ts server.ts ./
-COPY scripts/ scripts/
 COPY docker-entrypoint.sh ./
 
 # Pre-populate /deno-dir/ (DENO_DIR in this base image) with all remote deps.
 # --frozen: fail the build if deno.lock would change (integrity gate).
-RUN deno cache --frozen server.ts mod.ts scripts/stdio-shim.ts
+RUN deno cache --frozen server.ts mod.ts
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
 EXPOSE 3022

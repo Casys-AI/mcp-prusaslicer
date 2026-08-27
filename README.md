@@ -12,47 +12,13 @@ This is a slicing estimate, not printer telemetry or a price quote. It complemen
 [`mcp-dfm`](https://github.com/Casys-AI/mcp-dfm), which measures STEP geometry, and
 [`mcp-calculix`](https://github.com/Casys-AI/mcp-calculix), which performs FEA.
 
-## Quick start: Docker over stdio
+## Previously published Docker image over HTTP
 
-The published image bundles PrusaSlicer 2.9.2 and runs without a display. A classic
-stdio MCP host can launch it without a native PrusaSlicer installation. The digest
-below is the published multi-architecture 0.3.0 image. Package metadata and server
-runtime identity in that image are aligned at 0.3.0. Both `linux/amd64` and
-`linux/arm64` OCI labels point to commit
+The previously published 0.3.0 image bundles PrusaSlicer 2.9.2 and runs without a
+display. Its executable path is stateless HTTP on `/mcp`, port 3022, protocol
+`2026-07-28`. Package metadata and server runtime identity in that image are aligned at
+0.3.0. Both `linux/amd64` and `linux/arm64` OCI labels point to commit
 `f1cf6dd5489f64f53458117f291a5bd779ed1efb`.
-
-```json
-{
-  "mcpServers": {
-    "prusaslicer": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "-v",
-        "/absolute/path/to/slicing-jobs:/data:ro",
-        "ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97",
-        "stdio"
-      ]
-    }
-  }
-}
-```
-
-Both `stl_path` and `profile_ini_path` must be absolute paths as seen inside the
-container, for example `/data/bracket.stl` and `/data/profiles/mk4-pla.ini`. Docker
-Desktop must be allowed to share the host directory where applicable. Configuration file
-names vary by MCP host, but the `command` and `args` contract above is the tested stdio
-entrypoint.
-
-The stdio adapter answers the classic MCP `initialize` handshake locally and forwards
-calls to a private stateless HTTP server. It is shipped in the Docker image and source
-checkout; it is not a public JSR export.
-
-## Docker over HTTP
-
-The default image mode is stateless HTTP on `/mcp`, port 3022, protocol `2026-07-28`:
 
 ```bash
 docker run --rm \
@@ -61,8 +27,12 @@ docker run --rm \
   ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97
 ```
 
-From a source checkout, this complete call slices the committed 20 mm cube with the
-committed test profile. `Mcp-Name` must mirror `params.name`:
+Point a Streamable HTTP MCP client at `http://127.0.0.1:3022/mcp`.
+
+## HTTP tool call
+
+With the source fixture mount above, this complete call slices the committed 20 mm cube
+with the committed test profile. `Mcp-Name` must mirror `params.name`:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:3022/mcp \
@@ -91,7 +61,7 @@ curl -sS -X POST http://127.0.0.1:3022/mcp \
   }'
 ```
 
-The native reference call returns these values in `structuredContent`:
+The reference HTTP call returns these values in `structuredContent`:
 
 ```json
 {
@@ -109,7 +79,7 @@ It also returns `gcode_sha256`, `engine_name`, `engine_version`,
 `not_checked`. The text `content` is only a short model-facing summary; use
 `structuredContent` for automation.
 
-The examples above use the published multi-architecture 0.3.0 image
+The examples above use the previously published multi-architecture 0.3.0 HTTP image
 `ghcr.io/casys-ai/mcp-prusaslicer@sha256:628b2c06c7a184eb1542650787d146e42ec151d916953c4ee77a24783a90db97`.
 Package metadata and server runtime identity in that image are both `0.3.0`. Both
 `linux/amd64` and `linux/arm64` OCI labels point to commit
@@ -243,25 +213,49 @@ Before invoking PrusaSlicer, the tool independently:
 The expectation fields are optional so exploratory calls remain possible;
 provenance-sensitive workflows should require both.
 
-## Run from source or JSR
+## Run from source or JSR 0.3.1 over HTTP
 
-A native run requires `prusa-slicer` on `PATH`. From a checkout:
+An HTTP run requires `prusa-slicer` on `PATH`. From a checkout:
 
 ```bash
 deno task serve
 deno task serve -- --port=3099 --hostname=0.0.0.0
 ```
 
-The published JSR package is `0.3.0`; package metadata and server runtime identity
-are aligned. The earlier `@0.2.0` package is historical; its runtime identity still
-reports `0.1.0`.
+The 0.3.1 JSR package and this checkout provide stateless HTTP. The earlier `@0.2.0`
+package is historical; its runtime identity still reports `0.1.0`.
 
 ```bash
-deno run -A jsr:@casys/mcp-prusaslicer@0.3.0/server --port=3022
+deno run -A jsr:@casys/mcp-prusaslicer@0.3.1/server --port=3022
 ```
 
-Both commands expose stateless HTTP only. For stdio, use the Docker mode above or run
-`scripts/stdio-shim.ts` from a checkout.
+## Native stdio from a checkout, JSR 0.3.1, or local image
+
+Version 0.3.1 provides native stdio. The previously published 0.3.0 JSR package and
+pinned Docker digest predate it and cannot dispatch an actual `tools/call` over stdio;
+use their HTTP endpoints.
+
+From a checkout:
+
+```bash
+deno run -A server.ts --stdio
+```
+
+Or from JSR 0.3.1:
+
+```bash
+deno run -A jsr:@casys/mcp-prusaslicer@0.3.1/server --stdio
+```
+
+Or build a local image:
+
+```bash
+docker build -t mcp-prusaslicer:local .
+docker run --rm -i -v "$PWD/tests/fixtures:/data:ro" mcp-prusaslicer:local stdio
+```
+
+All 0.3.1 paths use the MCP server's native transport and accept legacy `2025-06-18`
+initialization from classic MCP clients.
 
 ## Development
 
@@ -276,8 +270,7 @@ stdio wire tests. Native tests additionally require PrusaSlicer 2.9.2 on `PATH`.
 Relevant implementation boundaries:
 
 ```text
-server.ts                          stateless HTTP composition root
-scripts/stdio-shim.ts              classic stdio to stateless HTTP adapter
+server.ts                          stateless HTTP and native stdio composition root
 src/api/input-artifact.ts          private snapshots and SHA-256 attestation
 src/api/prusa-slicer.ts            subprocess bridge and G-code statistic parser
 src/tools/estimate.ts              prusaslicer_estimate_fff contract
