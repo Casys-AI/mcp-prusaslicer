@@ -419,6 +419,10 @@ Deno.test("JSR and image publication remain gated on the qualified native suite"
       "each release gate must install the qualified PrusaSlicer package exactly",
     );
     assert(
+      workflow.includes("prusa-slicer --help >/dev/null 2>&1"),
+      "each release gate must prove the qualified slicer binary starts successfully",
+    );
+    assert(
       workflow.includes("PRUSASLICER_RUN_NATIVE=1 deno task release:check"),
       "each release gate must run native slicer tests before publication",
     );
