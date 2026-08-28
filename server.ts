@@ -3,7 +3,7 @@
 import { McpApp } from "@casys/mcp-server";
 import { SlicerToolsClient } from "./src/client.ts";
 
-const VERSION = "0.3.1";
+const VERSION = "0.4.0";
 const DEFAULT_PORT = 3022;
 const DEFAULT_HOSTNAME = "127.0.0.1";
 
@@ -24,7 +24,8 @@ export function createSlicerServer(
     maxConcurrent: 4,
     backpressureStrategy: "queue",
     validateSchema: true,
-    instructions: "FDM slicing estimation via PrusaSlicer. Supply an STL path and a " +
+    instructions:
+      "FDM slicing estimation via PrusaSlicer. Supply an admitted .stl path and a " +
       "PrusaSlicer INI profile; receive print-time and material-consumption " +
       "measurements from the real G-code. No prices — pricing is downstream (erpnext).",
     logger: options.logger ??

@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning:
 
 ## [Unreleased]
 
+## 0.4.0 — 2026-08-28
+
+### Added
+
+- `effective_config_summary`: a closed, raw-value summary of selected settings from the
+  exact emitted `prusaslicer_config` block. Its `config_sha256` equals
+  `effective_config_sha256`; absent selected keys are `null` rather than inferred
+  defaults.
+
+### Changed
+
+- Enforced the STL-plus-INI contract before any snapshot or slicer process: geometry
+  paths must end in `.stl` and pass a bounded ASCII-or-binary STL identity check. `.3mf`
+  project paths and archives renamed to `.stl` are refused fail-closed. Common ZIP
+  signatures are rejected before binary-STL admission, and the private STL copy is
+  revalidated before it can reach PrusaSlicer.
+- The release gate now installs the qualified `prusa-slicer=2.9.2+dfsg-1` engine and
+  runs the native suite, including assertions against the configuration block emitted by
+  the real slicer, before JSR or container-image publication. Release image tags must
+  match the package version.
+
 ## 0.3.1 — 2026-08-27
 
 ### Changed

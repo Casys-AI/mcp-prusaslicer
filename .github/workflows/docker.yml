@@ -9,7 +9,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  native-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          expected_tag="v$(node -p 'require("./deno.json").version')"
+          test "$GITHUB_REF_NAME" = "$expected_tag"
+
+      - name: Verify release gates with the qualified native engine
+        # Keep this identical to the JSR gate: the image cannot publish with
+        # weaker engine evidence than the package.
+        run: |
+          docker run --rm \
+            --entrypoint /bin/sh \
+            --user 0:0 \
+            --volume "${GITHUB_WORKSPACE}:/workspace:ro" \
+            --workdir /workspace \
+            denoland/deno:debian@sha256:2014dc167ece617ef7e7ba40631ac2234c59e75ce693e7cc2dc2602b3c87859d \
+            -eu -c '
+              apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                prusa-slicer=2.9.2+dfsg-1
+              test "$(dpkg-query -W -f=\${Version} prusa-slicer)" = "2.9.2+dfsg-1"
+              prusa-slicer --version
+              PRUSASLICER_RUN_NATIVE=1 deno task release:check
+            '
+
   build-push:
+    needs: native-check
     runs-on: ubuntu-latest
     permissions:
       contents: read

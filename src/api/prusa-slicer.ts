@@ -108,7 +108,47 @@ export interface GcodeStats {
    * This is not a hash of the input INI file.
    */
   effective_config_sha256: string;
+  /**
+   * Bounded, raw-value projection of selected keys from the exact emitted
+   * prusaslicer_config block. config_sha256 is identical to
+   * effective_config_sha256 so consumers can bind the projection to its source.
+   */
+  effective_config_summary: EffectiveConfigSummary;
 }
+
+const EFFECTIVE_CONFIG_SUMMARY_KEYS = [
+  "printer_technology",
+  "nozzle_diameter",
+  "layer_height",
+  "first_layer_height",
+  "fill_density",
+  "fill_pattern",
+  "perimeters",
+  "top_solid_layers",
+  "bottom_solid_layers",
+  "support_material",
+  "support_material_auto",
+  "filament_diameter",
+  "filament_density",
+  "gcode_flavor",
+] as const;
+
+type EffectiveConfigSummaryKey = typeof EFFECTIVE_CONFIG_SUMMARY_KEYS[number];
+
+export type EffectiveConfigSummaryValues = {
+  [key in EffectiveConfigSummaryKey]: string | null;
+};
+
+export interface EffectiveConfigSummary {
+  /** SHA-256 of the exact emitted block from which values were read. */
+  config_sha256: string;
+  /** Raw values exactly as written by PrusaSlicer; null means the key was absent. */
+  values: EffectiveConfigSummaryValues;
+}
+
+const EFFECTIVE_CONFIG_SUMMARY_KEY_SET = new Set<string>(
+  EFFECTIVE_CONFIG_SUMMARY_KEYS,
+);
 
 export interface SliceResult extends GcodeStats {
   /**
@@ -334,6 +374,38 @@ function extractPrusaslicerConfigBlock(gcode: string): string {
 }
 
 /**
+ * Project a fixed set of emitted settings without coercing their values or
+ * inferring PrusaSlicer defaults. The emitted block remains the authority; the
+ * returned config_sha256 identifies that exact block.
+ */
+function summarizeEffectiveConfig(
+  configBlock: string,
+  configSha256: string,
+): EffectiveConfigSummary {
+  const values = Object.fromEntries(
+    EFFECTIVE_CONFIG_SUMMARY_KEYS.map((key) => [key, null]),
+  ) as EffectiveConfigSummaryValues;
+
+  for (const line of configBlock.split("\n")) {
+    const match = line.match(/^;\s*([a-z0-9_]+)\s*=\s*(.*)$/i);
+    if (!match) continue;
+    const candidate = match[1].toLowerCase();
+    if (!EFFECTIVE_CONFIG_SUMMARY_KEY_SET.has(candidate)) continue;
+    const key = candidate as EffectiveConfigSummaryKey;
+    const rawValue = match[2].trim();
+    if (values[key] !== null) {
+      throw new SlicingError(
+        `G-code emitted duplicate selected config key '${key}'; ` +
+          "the bounded effective-config summary would be ambiguous.",
+      );
+    }
+    values[key] = rawValue;
+  }
+
+  return { config_sha256: configSha256, values };
+}
+
+/**
  * Extract measurement fields, observed engine identity, and the exact
  * prusaslicer_config block hash from a PrusaSlicer G-code file.
  *
@@ -350,6 +422,10 @@ export async function parseGcodeStats(gcode: string): Promise<GcodeStats> {
   const configBlock = extractPrusaslicerConfigBlock(gcode);
   const effective_config_sha256 = await sha256Hex(
     new TextEncoder().encode(configBlock),
+  );
+  const effective_config_summary = summarizeEffectiveConfig(
+    configBlock,
+    effective_config_sha256,
   );
 
   const mmRaw = extract(/^;\s*filament used \[mm\]\s*=\s*(.+)$/m);
@@ -431,5 +507,6 @@ export async function parseGcodeStats(gcode: string): Promise<GcodeStats> {
     engine_name: engine.name,
     engine_version: engine.version,
     effective_config_sha256,
+    effective_config_summary,
   };
 }

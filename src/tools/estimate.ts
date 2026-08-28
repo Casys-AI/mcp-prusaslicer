@@ -19,6 +19,7 @@
  *   engine_name         — observed slicer name from the G-code header
  *   engine_version      — observed slicer version from the G-code header
  *   effective_config_sha256 — SHA-256 of the emitted prusaslicer_config block
+ *   effective_config_summary — bounded raw projection tied to that same hash
  *   overrides_applied   — caller-provided print overrides that were forwarded
  *   stl_artifact        — attestation of the STL consumed
  *   profile_artifact    — attestation of the INI profile consumed
@@ -48,6 +49,7 @@ const NOT_CHECKED: string[] = [
   "engine_name and engine_version are parsed from the G-code header, not from the" +
   " prusa-slicer binary.",
   "effective_config_sha256 hashes the emitted prusaslicer_config block, not the input INI.",
+  "effective_config_summary is a fixed raw-key projection of that emitted block; null means the selected key was absent, not that a PrusaSlicer default was inferred.",
 ];
 
 const INPUT_SCHEMA: Record<string, unknown> = {
@@ -58,8 +60,9 @@ const INPUT_SCHEMA: Record<string, unknown> = {
     stl_path: {
       type: "string",
       description:
-        "Absolute path to the STL file to slice. The file must be accessible on the" +
-        " server filesystem.",
+        "Absolute path to the admitted STL file to slice. Only .stl paths are accepted;" +
+        " the server rejects project archives and non-STL content before snapshotting" +
+        " or invoking PrusaSlicer.",
     },
     stl_sha256: {
       type: "string",
@@ -124,6 +127,7 @@ const OUTPUT_SCHEMA: Record<string, unknown> = {
     "engine_name",
     "engine_version",
     "effective_config_sha256",
+    "effective_config_summary",
     "overrides_applied",
     "not_checked",
     "stl_artifact",
@@ -178,6 +182,54 @@ const OUTPUT_SCHEMA: Record<string, unknown> = {
         "SHA-256 hex digest of the exact emitted `; prusaslicer_config = begin`" +
         " ... `; prusaslicer_config = end` block. Not a hash of the input INI.",
     },
+    effective_config_summary: {
+      type: "object",
+      additionalProperties: false,
+      required: ["config_sha256", "values"],
+      description:
+        "Bounded raw-value projection from the exact emitted prusaslicer_config block. " +
+        "config_sha256 equals effective_config_sha256; null means the selected key was " +
+        "absent from the emitted block, not a server-inferred default.",
+      properties: {
+        config_sha256: { type: "string" },
+        values: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "printer_technology",
+            "nozzle_diameter",
+            "layer_height",
+            "first_layer_height",
+            "fill_density",
+            "fill_pattern",
+            "perimeters",
+            "top_solid_layers",
+            "bottom_solid_layers",
+            "support_material",
+            "support_material_auto",
+            "filament_diameter",
+            "filament_density",
+            "gcode_flavor",
+          ],
+          properties: {
+            printer_technology: { type: ["string", "null"] },
+            nozzle_diameter: { type: ["string", "null"] },
+            layer_height: { type: ["string", "null"] },
+            first_layer_height: { type: ["string", "null"] },
+            fill_density: { type: ["string", "null"] },
+            fill_pattern: { type: ["string", "null"] },
+            perimeters: { type: ["string", "null"] },
+            top_solid_layers: { type: ["string", "null"] },
+            bottom_solid_layers: { type: ["string", "null"] },
+            support_material: { type: ["string", "null"] },
+            support_material_auto: { type: ["string", "null"] },
+            filament_diameter: { type: ["string", "null"] },
+            filament_density: { type: ["string", "null"] },
+            gcode_flavor: { type: ["string", "null"] },
+          },
+        },
+      },
+    },
     overrides_applied: {
       type: "object",
       additionalProperties: false,
@@ -227,7 +279,9 @@ const estimateFffTool: SlicerTool = {
     " it does not price. Pricing (filament cost, machine time) is handled downstream by" +
     " erpnext. The profile_ini_path supplies the caller-owned base configuration; optional" +
     " tool arguments override layer height, infill, or filament density. The server" +
-    " embeds no production profile.",
+    " embeds no production profile. It accepts only admitted ASCII or binary STL inputs," +
+    " then returns an attested, bounded effective-config summary read from the emitted" +
+    " G-code block.",
   category: "estimation",
   inputSchema: INPUT_SCHEMA,
   outputSchema: OUTPUT_SCHEMA,
@@ -331,6 +385,7 @@ const estimateFffTool: SlicerTool = {
         engine_name: result.engine_name,
         engine_version: result.engine_version,
         effective_config_sha256: result.effective_config_sha256,
+        effective_config_summary: result.effective_config_summary,
         overrides_applied: result.overrides_applied,
         not_checked: NOT_CHECKED,
         stl_artifact: {

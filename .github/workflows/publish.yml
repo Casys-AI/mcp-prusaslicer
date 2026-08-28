@@ -11,12 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-
-      - name: Verify release gates
-        run: deno task release:check
+      - name: Verify release gates with the qualified native engine
+        # Keep the Deno base immutable and the native slicer exact. This mirrors
+        # the Debian engine package qualified by the committed reference fixture.
+        run: |
+          docker run --rm \
+            --entrypoint /bin/sh \
+            --user 0:0 \
+            --volume "${GITHUB_WORKSPACE}:/workspace:ro" \
+            --workdir /workspace \
+            denoland/deno:debian@sha256:2014dc167ece617ef7e7ba40631ac2234c59e75ce693e7cc2dc2602b3c87859d \
+            -eu -c '
+              apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                prusa-slicer=2.9.2+dfsg-1
+              test "$(dpkg-query -W -f=\${Version} prusa-slicer)" = "2.9.2+dfsg-1"
+              prusa-slicer --version
+              PRUSASLICER_RUN_NATIVE=1 deno task release:check
+            '
 
   publish-jsr:
     needs: check
