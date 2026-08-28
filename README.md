@@ -16,25 +16,18 @@ This is a slicing estimate, not printer telemetry or a price quote. It complemen
 [`mcp-dfm`](https://github.com/Casys-AI/mcp-dfm), which measures STEP geometry, and
 [`mcp-calculix`](https://github.com/Casys-AI/mcp-calculix), which performs FEA.
 
-## Current source release 0.4.0
+## Current release 0.4.0
 
-This checkout declares package and MCP runtime identity `0.4.0`. The pinned artifact
-below remains the published `0.3.1` image until its successor image is released; do not
-infer the 0.4.0 STL-admission behavior from that older digest.
-
-## Published Docker image 0.3.1
-
-The published 0.3.1 image bundles PrusaSlicer 2.9.2 and runs without a display. It
+The published 0.4.0 image bundles PrusaSlicer 2.9.2 and runs without a display. It
 defaults to stateless HTTP on `/mcp`, port 3022, protocol `2026-07-28`; pass `stdio` to
 use native MCP stdio instead. Package metadata and server runtime identity are both
-`0.3.1`. Its `linux/amd64` and `linux/arm64` OCI labels point to commit
-`2e69f5b0ebceda11cc20f3afa5692078fd50a789`.
+`0.4.0`.
 
 ```bash
 docker run --rm \
   -p 127.0.0.1:3022:3022 \
   -v "$PWD/tests/fixtures:/data:ro" \
-  ghcr.io/casys-ai/mcp-prusaslicer@sha256:bb9c857c5d059215f9297843eb7b252b1663492c059d8c8301d5598947d06f4b http
+  ghcr.io/casys-ai/mcp-prusaslicer@sha256:e63093777eff5f766e51acf1afe7cdb3b0e20c133cff93ad0d3e3b9b979e1ab3 http
 ```
 
 Point a Streamable HTTP MCP client at `http://127.0.0.1:3022/mcp`.
@@ -89,16 +82,10 @@ It also returns `gcode_sha256`, `engine_name`, `engine_version`,
 `overrides_applied`, both input attestations, and `not_checked`. The text `content` is
 only a short model-facing summary; use `structuredContent` for automation.
 
-The examples above use the published multi-architecture 0.3.1 image
-`ghcr.io/casys-ai/mcp-prusaslicer@sha256:bb9c857c5d059215f9297843eb7b252b1663492c059d8c8301d5598947d06f4b`.
+The examples above use the published multi-architecture 0.4.0 image
+`ghcr.io/casys-ai/mcp-prusaslicer@sha256:e63093777eff5f766e51acf1afe7cdb3b0e20c133cff93ad0d3e3b9b979e1ab3`.
 `ghcr.io/casys-ai/mcp-prusaslicer:latest` is a mutable convenience tag, not the
 authority for a specific version or capability.
-
-The earlier 0.2.0 package and image are historical. That image's `/app/deno.json`
-package version is `0.2.0`, but `/app/server.ts` still has the legacy `VERSION` `0.1.0`,
-so `server/discover` or health runtime identity from that published package or image
-reports `0.1.0`. Those artifacts do not emit `engine_name`, `engine_version`,
-`effective_config_sha256`, or `overrides_applied`.
 
 The images are published for `linux/amd64` and `linux/arm64`. Pin the OCI digest when a
 deployment must be reproducible.
@@ -271,8 +258,7 @@ deno task serve
 deno task serve -- --port=3099 --hostname=0.0.0.0
 ```
 
-This checkout provides stateless HTTP. The last published `0.3.1` JSR package is the
-pre-0.4.0 baseline; use an exact released version when reproducing an older result.
+This checkout and the published JSR package provide stateless HTTP.
 
 ```bash
 deno run -A jsr:@casys/mcp-prusaslicer/server --port=3022
@@ -280,7 +266,7 @@ deno run -A jsr:@casys/mcp-prusaslicer/server --port=3022
 
 ## Native stdio from a checkout or released artifact
 
-The current source and the published 0.3.1 JSR/image use native stdio.
+The current source and the published 0.4.0 JSR/image use native stdio.
 
 From a checkout:
 
@@ -288,10 +274,10 @@ From a checkout:
 deno run -A server.ts --stdio
 ```
 
-Or from JSR 0.3.1:
+Or from JSR 0.4.0:
 
 ```bash
-deno run -A jsr:@casys/mcp-prusaslicer@0.3.1/server --stdio
+deno run -A jsr:@casys/mcp-prusaslicer@0.4.0/server --stdio
 ```
 
 Or use the published image with `stdio` as its argument:
@@ -299,10 +285,10 @@ Or use the published image with `stdio` as its argument:
 ```bash
 docker run --rm -i \
   -v "$PWD/tests/fixtures:/data:ro" \
-  ghcr.io/casys-ai/mcp-prusaslicer@sha256:bb9c857c5d059215f9297843eb7b252b1663492c059d8c8301d5598947d06f4b stdio
+  ghcr.io/casys-ai/mcp-prusaslicer@sha256:e63093777eff5f766e51acf1afe7cdb3b0e20c133cff93ad0d3e3b9b979e1ab3 stdio
 ```
 
-The source path and the published 0.3.1 artifacts use the MCP server's native transport
+The source path and the published 0.4.0 artifacts use the MCP server's native transport
 and accept legacy `2025-06-18` initialization from classic MCP clients.
 
 ## Development
