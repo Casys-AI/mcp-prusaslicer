@@ -11,7 +11,8 @@
     "lint": "deno lint",
     "fmt": "deno fmt --check deno.json mod.ts server.ts src tests scripts",
     "release:check": "deno task fmt && deno task check && deno task lint && deno task test",
-    "test": "deno test --allow-all tests/"
+    "test": "deno test --allow-all tests/",
+    "test:published": "PRUSASLICER_RUN_PUBLISHED_ARTIFACTS=1 deno test --allow-all --filter='published artifacts' tests/stdio_test.ts"
   },
   "exports": {
     ".": "./mod.ts",

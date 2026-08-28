@@ -43,6 +43,9 @@ jobs:
         with:
           deno-version: v2.x
 
+      - name: Verify JSR publication contents
+        run: deno publish --dry-run
+
       # A push that does not bump the version must not turn the run red:
       # JSR versions are immutable, so "already published" is a no-op here,
       # not a failure.

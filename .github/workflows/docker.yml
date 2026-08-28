@@ -42,6 +42,8 @@ jobs:
   build-push:
     needs: native-check
     runs-on: ubuntu-latest
+    outputs:
+      image_digest: ${{ steps.image.outputs.digest }}
     permissions:
       contents: read
       packages: write
@@ -66,10 +68,72 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
 
-      - uses: docker/build-push-action@v6
+      - id: image
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  published-artifact-smoke:
+    if: github.ref == 'refs/heads/main'
+    needs: build-push
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Wait for the matching JSR publication workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deadline=$((SECONDS + 900))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            run=$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow publish.yml \
+              --commit "$GITHUB_SHA" \
+              --json status,conclusion \
+              --limit 1)
+            status=$(printf '%s' "$run" | jq -r '.[0].status // "missing"')
+            conclusion=$(printf '%s' "$run" | jq -r '.[0].conclusion // ""')
+            if [ "$status" = completed ]; then
+              test "$conclusion" = success
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for Publish to complete for $GITHUB_SHA" >&2
+          exit 1
+
+      - id: jsr
+        name: Wait for the matching published JSR version to resolve
+        run: |
+          name=$(deno eval 'console.log(JSON.parse(Deno.readTextFileSync("deno.json")).name)')
+          version=$(deno eval 'console.log(JSON.parse(Deno.readTextFileSync("deno.json")).version)')
+          deadline=$((SECONDS + 300))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            body=$(curl --fail --silent --show-error "https://jsr.io/${name}/meta.json" || echo '{}')
+            published=$(BODY="$body" VERSION="$version" deno eval 'const metadata = JSON.parse(Deno.env.get("BODY") ?? "{}"); console.log((Deno.env.get("VERSION") ?? "") in (metadata.versions ?? {}))')
+            if [ "$published" = true ]; then
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for ${name}@${version} on JSR" >&2
+          exit 1
+
+      - name: Smoke-test the published JSR package and pinned GHCR digest
+        env:
+          PUBLISHED_JSR_VERSION: ${{ steps.jsr.outputs.version }}
+          PUBLISHED_GHCR_IMAGE: ghcr.io/casys-ai/mcp-prusaslicer@${{ needs.build-push.outputs.image_digest }}
+        run: deno task test:published

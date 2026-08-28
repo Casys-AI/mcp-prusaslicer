@@ -41,51 +41,85 @@ interface CliOptions {
   transport: "http" | "stdio";
 }
 
+function parsePort(value: string | undefined, flag: string): number {
+  if (value === undefined || !/^[0-9]+$/.test(value)) {
+    throw new TypeError(`${flag} must be an integer in 1-65535, got: ${value}`);
+  }
+  const port = Number(value);
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
+    throw new TypeError(`${flag} must be an integer in 1-65535, got: ${value}`);
+  }
+  return port;
+}
+
+function parseHostname(value: string | undefined, flag: string): string {
+  const hostname = value?.trim();
+  if (!hostname) {
+    throw new TypeError(`${flag} requires a non-empty value.`);
+  }
+  return hostname;
+}
+
+function nextOptionValue(args: string[], index: number): string | undefined {
+  const value = args[index + 1];
+  return value?.startsWith("-") ? undefined : value;
+}
+
 export function parseCli(args: string[]): CliOptions {
-  let port = parseInt(Deno.env.get("MCP_PORT") ?? "", 10) || DEFAULT_PORT;
-  let hostname = Deno.env.get("MCP_HOSTNAME") ?? DEFAULT_HOSTNAME;
+  const envPort = Deno.env.get("MCP_PORT");
+  const envHostname = Deno.env.get("MCP_HOSTNAME");
+  let port = envPort === undefined ? DEFAULT_PORT : parsePort(envPort, "MCP_PORT");
+  let hostname = envHostname === undefined
+    ? DEFAULT_HOSTNAME
+    : parseHostname(envHostname, "MCP_HOSTNAME");
   let transport: CliOptions["transport"] = "http";
-  let httpFlag: string | undefined;
+  const seen = new Set<"stdio" | "port" | "hostname">();
+
+  function assertNotDuplicate(
+    option: "stdio" | "port" | "hostname",
+    flag: string,
+  ): void {
+    if (seen.has(option)) {
+      throw new TypeError(`Duplicate option: ${flag}`);
+    }
+    seen.add(option);
+  }
+
+  function assertHttpTransport(flag: string): void {
+    if (seen.has("stdio")) {
+      throw new TypeError(`--stdio cannot be combined with ${flag}.`);
+    }
+  }
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--stdio") {
-      if (httpFlag) {
-        throw new TypeError(`--stdio cannot be combined with ${httpFlag}.`);
+      assertNotDuplicate("stdio", "--stdio");
+      if (seen.has("port") || seen.has("hostname")) {
+        throw new TypeError("--stdio cannot be combined with HTTP flags.");
       }
       transport = "stdio";
     } else if (arg === "--port" || arg === "-p") {
-      if (transport === "stdio") {
-        throw new TypeError("--stdio cannot be combined with HTTP flags.");
-      }
-      httpFlag = "--port";
-      const val = args[++i];
-      port = parseInt(val, 10);
-      if (!isFinite(port) || port < 1 || port > 65535) {
-        throw new TypeError(`--port must be an integer in 1-65535, got: ${val}`);
-      }
+      assertHttpTransport(arg);
+      assertNotDuplicate("port", arg);
+      const val = nextOptionValue(args, i);
+      i++;
+      port = parsePort(val, arg);
     } else if (arg.startsWith("--port=")) {
-      if (transport === "stdio") {
-        throw new TypeError("--stdio cannot be combined with HTTP flags.");
-      }
-      httpFlag = "--port";
+      assertHttpTransport("--port");
+      assertNotDuplicate("port", "--port");
       const val = arg.slice("--port=".length);
-      port = parseInt(val, 10);
-      if (!isFinite(port) || port < 1 || port > 65535) {
-        throw new TypeError(`--port must be an integer in 1-65535, got: ${val}`);
-      }
+      port = parsePort(val, "--port");
     } else if (arg === "--hostname" || arg === "-H") {
-      if (transport === "stdio") {
-        throw new TypeError("--stdio cannot be combined with HTTP flags.");
-      }
-      httpFlag = "--hostname";
-      hostname = args[++i];
+      assertHttpTransport(arg);
+      assertNotDuplicate("hostname", arg);
+      const val = nextOptionValue(args, i);
+      i++;
+      hostname = parseHostname(val, arg);
     } else if (arg.startsWith("--hostname=")) {
-      if (transport === "stdio") {
-        throw new TypeError("--stdio cannot be combined with HTTP flags.");
-      }
-      httpFlag = "--hostname";
-      hostname = arg.slice("--hostname=".length);
+      assertHttpTransport("--hostname");
+      assertNotDuplicate("hostname", "--hostname");
+      hostname = parseHostname(arg.slice("--hostname=".length), "--hostname");
     } else {
       throw new TypeError(`Unknown argument: ${arg}`);
     }

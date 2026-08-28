@@ -432,12 +432,35 @@ Deno.test("JSR and image publication remain gated on the qualified native suite"
     "JSR publication must depend on the native release gate",
   );
   assert(
+    publishWorkflow.includes("deno publish --dry-run"),
+    "JSR publication must validate its immutable package contents first",
+  );
+  assert(
+    publishWorkflow.indexOf("deno publish --dry-run") <
+      publishWorkflow.lastIndexOf("run: deno publish"),
+    "the JSR dry run must precede the real publication command",
+  );
+  assert(
     /build-push:\s+needs: native-check/.test(dockerWorkflow),
     "image publication must depend on the native release gate",
   );
   assert(
     dockerWorkflow.includes('test "$GITHUB_REF_NAME" = "$expected_tag"'),
     "a release image tag must match the package version",
+  );
+  assert(
+    /published-artifact-smoke:\s+if: github\.ref == 'refs\/heads\/main'\s+needs: build-push/
+      .test(
+        dockerWorkflow,
+      ),
+    "published-artifact smoke must run after the pushed main-branch image",
+  );
+  assert(
+    dockerWorkflow.includes("--workflow publish.yml") &&
+      dockerWorkflow.includes("PUBLISHED_JSR_VERSION") &&
+      dockerWorkflow.includes("PUBLISHED_GHCR_IMAGE") &&
+      dockerWorkflow.includes("deno task test:published"),
+    "published-artifact smoke must await JSR and use published immutable identities",
   );
 });
 
@@ -459,6 +482,40 @@ Deno.test("--stdio rejects HTTP flags in either order", () => {
     ]
   ) {
     assertThrows(() => parseCli(args), TypeError, "--stdio cannot be combined");
+  }
+});
+
+Deno.test("parseCli strictly validates HTTP option values", () => {
+  for (
+    const args of [
+      ["--port"],
+      ["--port="],
+      ["--port", "3022suffix"],
+      ["--port=3022suffix"],
+      ["--port", "0"],
+      ["--port", "65536"],
+      ["--port", "--stdio"],
+      ["--hostname"],
+      ["--hostname="],
+      ["--hostname", "   "],
+      ["--hostname", "--stdio"],
+    ]
+  ) {
+    assertThrows(() => parseCli(args), TypeError);
+  }
+});
+
+Deno.test("parseCli rejects duplicate transport and HTTP options", () => {
+  for (
+    const args of [
+      ["--stdio", "--stdio"],
+      ["--port", "3022", "--port=3023"],
+      ["-p", "3022", "--port", "3023"],
+      ["--hostname", "127.0.0.1", "--hostname=localhost"],
+      ["-H", "127.0.0.1", "--hostname", "localhost"],
+    ]
+  ) {
+    assertThrows(() => parseCli(args), TypeError, "Duplicate option");
   }
 });
 
